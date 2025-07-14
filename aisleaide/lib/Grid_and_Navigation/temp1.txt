@@ -1,0 +1,371 @@
+import 'package:flutter/material.dart';
+
+enum TileType {
+  walkable,
+  nonWalkable,
+  path,
+  beacons,
+}
+
+class GridMap extends StatefulWidget {
+  const GridMap({super.key});
+
+  @override
+  _GridMapState createState() => _GridMapState();
+}
+
+class _GridMapState extends State<GridMap> {
+  List<List<TileType>> tiles = [];
+  late List<List<bool>> visited;
+  late List<List<double>> fScores;
+  late List<List<double>> gScores;
+  late List<List<Offset>> cameFrom;
+
+  Offset? startPoint;
+  Offset? endPoint;
+  bool selectingStart = true;
+  bool generatingPath = false;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeGrid();
+  }
+
+  void initializeGrid() {
+    // Initialize the grid with walkable and non-walkable tiles
+    tiles = List.generate(
+      64, // Change the total number of rows to 64
+      (rowIndex) => List.generate(
+        34,
+        (colIndex) {
+          // Adjust according to the specified configuration
+          if ((rowIndex == 0 && colIndex == 33) || // 1st row, 34th cell
+              (rowIndex == 31 && colIndex == 0) || // 32nd row, 1st cell
+              (rowIndex == 63 && colIndex == 33)) {
+            // 64th row, 34th cell
+            return TileType.beacons; // Set these cells as beacons
+          } else if (rowIndex >= 0 && rowIndex <= 8) {
+            // 1st row to 9th row, tiles 31-34 are non-walkable
+            if (colIndex >= 30) {
+              return TileType.nonWalkable;
+            } else {
+              return TileType.walkable;
+            }
+          } else if (rowIndex >= 9 && rowIndex <= 34) {
+            // 10th row to 34th row
+            if (colIndex >= 0 && colIndex <= 4 ||
+                colIndex >= 10 && colIndex <= 14 ||
+                colIndex >= 20 && colIndex <= 24 ||
+                colIndex >= 30) {
+              return TileType.nonWalkable;
+            } else if (rowIndex == 34) {
+              // 35th row
+              if (colIndex >= 0 && colIndex <= 4 ||
+                  colIndex >= 10 && colIndex <= 14 ||
+                  colIndex >= 20 && colIndex <= 24) {
+                return TileType.nonWalkable;
+              }
+            }
+          } else if (rowIndex == 35) {
+            // 35th row
+            if (colIndex >= 0 && colIndex <= 4 ||
+                colIndex >= 10 && colIndex <= 14 ||
+                colIndex >= 20 && colIndex <= 24) {
+              return TileType.nonWalkable;
+            } else {
+              return TileType.walkable;
+            }
+          } else if (rowIndex >= 36 && rowIndex <= 41) {
+            // 36th row to 41st row, all walkable
+            return TileType.walkable;
+          } else if (rowIndex >= 42 && rowIndex <= 53) {
+            // 42nd row to 53rd row
+            if (colIndex >= 5 && colIndex <= 9) {
+              return TileType.walkable;
+            } else {
+              return TileType.nonWalkable;
+            }
+          } else if (rowIndex >= 60 && rowIndex <= 63) {
+            // 54th row to 59th row, all walkable
+            return TileType.nonWalkable;
+          }
+          return TileType.walkable;
+        },
+      ),
+    );
+
+    // Remove the initialization of the last row in other lists
+    visited = List.generate(
+      64, // Change the total number of rows to 64
+      (rowIndex) => List.generate(34, (colIndex) => false),
+    );
+
+    fScores = List.generate(
+      64, // Change the total number of rows to 64
+      (rowIndex) => List.generate(34, (colIndex) => double.infinity),
+    );
+
+    gScores = List.generate(
+      64, // Change the total number of rows to 64
+      (rowIndex) => List.generate(34, (colIndex) => double.infinity),
+    );
+
+    cameFrom = List.generate(
+      64, // Change the total number of rows to 64
+      (rowIndex) => List.generate(34, (colIndex) => Offset(-1, -1)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
+    final double tileSize = screenSize.width / 34;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Grid Map Example'),
+      ),
+      body: Stack(
+        children: [
+          GridView.builder(
+            itemCount: tiles.length * tiles[0].length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: tiles[0].length,
+              childAspectRatio: 1.0,
+            ),
+            itemBuilder: (context, index) {
+              int rowIndex = index ~/ tiles[0].length;
+              int colIndex = index % tiles[0].length;
+              return GestureDetector(
+                onTap: () {
+                  _handleTap(rowIndex, colIndex);
+                },
+                child: _buildTileWidget(
+                    tiles[rowIndex][colIndex], tileSize, rowIndex, colIndex),
+              );
+            },
+          ),
+          // Display "Generating path..." message while the path is being generated
+          if (generatingPath) _buildMessageWidget('Generating path...'),
+          // Display message for selecting start or end point
+          if (selectingStart && startPoint == null)
+            _buildMessageWidget('Select a starting point'),
+          if (!selectingStart && endPoint == null)
+            _buildMessageWidget('Select an ending point'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTileWidget(
+      TileType type, double tileSize, int rowIndex, int colIndex) {
+    Color color;
+    switch (type) {
+      case TileType.walkable:
+        color = Colors.green;
+        break;
+      case TileType.nonWalkable:
+        color = Colors.red;
+        break;
+      case TileType.path:
+        color = Colors.blue;
+        break;
+      case TileType.beacons: // Add a case for TileType.beacons
+        color = Colors.purple; // Set color for beacons
+        break;
+      default: // Add a default case to handle other TileType values
+        color = Colors.white; // Set a default color
+    }
+    String message =
+        ''; // Message to be displayed in the center of the grid cell
+    bool showMessage = false; // Flag to determine if message should be shown
+
+    // Check if the current cell is the selected start or end point
+    if (startPoint != null &&
+        rowIndex == startPoint!.dy.toInt() &&
+        colIndex == startPoint!.dx.toInt()) {
+      color =
+          Colors.black; // Change color to black for the selected start point
+    } else if (endPoint != null &&
+        rowIndex == endPoint!.dy.toInt() &&
+        colIndex == endPoint!.dx.toInt()) {
+      color =
+          Colors.yellow; // Change color to yellow for the selected end point
+    } else if (startPoint == null) {
+      message = 'Select a starting point';
+      showMessage = true;
+    } else if (endPoint == null) {
+      message = 'Select an ending point';
+      showMessage = true;
+    } else if (tiles[rowIndex][colIndex] == TileType.path) {
+      color = Colors.blue; // Change color to blue for the path tiles
+    }
+
+    return Stack(
+      children: [
+        Container(
+          width: tileSize,
+          height: tileSize,
+          margin: const EdgeInsets.all(1),
+          color: color,
+        ),
+        if (showMessage)
+          Center(
+            child: Container(
+              color: Colors.black54,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  message,
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMessageWidget(String message) {
+    print('Displaying message: $message'); // Debug statement
+    return Center(
+      child: Container(
+        color: Colors.black54,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(
+            message,
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _findAndVisualizePath(Offset start, Offset end) async {
+  print('Inside _findAndVisualizePath'); // Debug statement added
+
+  setState(() {
+    generatingPath = true;
+  });
+
+  await initializeAStar(start, end);
+
+  setState(() {
+    visualizePath();
+    generatingPath = false;
+  });
+}
+
+
+  Future<void> initializeAStar(Offset start, Offset end) async {
+    print('Initializing A* algorithm...');
+    List<int> dx = [1, 0, -1, 0];
+    List<int> dy = [0, 1, 0, -1];
+
+    List<List<double>> openSet = [];
+
+    openSet.add([start.dx, start.dy, 0.0, 0.0]);
+    gScores[start.dx.toInt()][start.dy.toInt()] = 0.0;
+    fScores[start.dx.toInt()][start.dy.toInt()] = heuristic(start, end);
+
+    while (openSet.isNotEmpty) {
+      openSet.sort((a, b) => (a[2] + a[3]).compareTo(b[2] + b[3]));
+      List<double> current = openSet.removeAt(0);
+      int x = current[0].toInt();
+      int y = current[1].toInt();
+      print('Processing cell: ($x, $y)');
+
+      if (x == end.dx.toInt() && y == end.dy.toInt()) {
+        print('Reached the destination.');
+        return;
+      }
+      visited[x][y] = true;
+
+      for (int i = 0; i < 4; i++) {
+        int newX = x + dx[i];
+        int newY = y + dy[i];
+
+        if (newX >= 0 &&
+            newX < tiles.length &&
+            newY >= 0 &&
+            newY < tiles[0].length &&
+            !visited[newX][newY] &&
+            tiles[newX][newY] != TileType.nonWalkable) {
+          double tentativeGScore = gScores[x][y] + 1;
+          print('Checking neighbor: ($newX, $newY)');
+          if (tentativeGScore < gScores[newX][newY]) {
+            print('Updating scores for neighbor: ($newX, $newY)');
+            cameFrom[newX][newY] = Offset(x.toDouble(), y.toDouble());
+            gScores[newX][newY] = tentativeGScore;
+            fScores[newX][newY] = gScores[newX][newY] +
+                heuristic(Offset(newX.toDouble(), newY.toDouble()), end);
+            openSet.add([
+              newX.toDouble(),
+              newY.toDouble(),
+              gScores[newX][newY],
+              fScores[newX][newY]
+            ]);
+          }
+        }
+      }
+      printAStarState(); // Print A* algorithm state
+    }
+  }
+
+  void printAStarState() {
+    // Print the current state of A* algorithm
+    print('Visited: $visited');
+    print('fScores: $fScores');
+    print('gScores: $gScores');
+    print('cameFrom: $cameFrom');
+  }
+
+  double heuristic(Offset a, Offset b) {
+    return (a.dx - b.dx).abs() + (a.dy - b.dy).abs();
+  }
+
+  void visualizePath() {
+    // Reset path tiles
+    for (int i = 0; i < tiles.length; i++) {
+      for (int j = 0; j < tiles[i].length; j++) {
+        if (tiles[i][j] == TileType.path) {
+          tiles[i][j] = TileType.walkable;
+        }
+      }
+    }
+
+    int x = startPoint!.dx.toInt();
+    int y = startPoint!.dy.toInt();
+
+    // Traverse the cameFrom grid to reconstruct the path
+    while (x != endPoint!.dx.toInt() || y != endPoint!.dy.toInt()) {
+      // Mark the current tile as part of the path
+      tiles[y][x] = TileType.path;
+
+      // Move to the next tile in the path
+      Offset next = cameFrom[x][y];
+      x = next.dx.toInt();
+      y = next.dy.toInt();
+    }
+  }
+
+  void _handleTap(int rowIndex, int colIndex) {
+    setState(() {
+      if (startPoint == null) {
+        startPoint = Offset(colIndex.toDouble(), rowIndex.toDouble());
+        selectingStart = false;
+      } else if (endPoint == null) {
+        endPoint = Offset(colIndex.toDouble(), rowIndex.toDouble());
+        _findAndVisualizePath(startPoint!, endPoint!);
+      }
+    });
+  }
+}
+
+void main() {
+  runApp(const MaterialApp(
+    home: GridMap(),
+  ));
+}

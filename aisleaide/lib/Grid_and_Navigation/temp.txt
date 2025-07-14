@@ -1,0 +1,233 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:aisleaide/Lathma/beacon.dart';
+import 'package:flutter/material.dart';
+
+enum TileType {
+  walkable,
+  nonWalkable,
+  path,
+  beacon1,
+  beacon2,
+  beacon3,
+}
+
+class GridMap extends StatefulWidget {
+  const GridMap({Key? key}) : super(key: key);
+
+  @override
+  _GridMapState createState() => _GridMapState();
+}
+
+class _GridMapState extends State<GridMap> {
+  List<List<String>> tiles = [];
+  StreamSubscription<Map<String, bool>>? _beaconSubscription;
+  double txPower = -65; // TX power of the beacons
+  int userRowIndex = -1; // User's current row index on the grid
+  int userColIndex = -1; // User's current column index on the grid
+  double closestBeaconDistance = double.infinity; // Closest beacon distance
+
+  @override
+  void initState() {
+    super.initState();
+    initializeGrid();
+    _startBeaconTracking();
+  }
+
+  @override
+  void dispose() {
+    _beaconSubscription?.cancel();
+    super.dispose();
+  }
+
+  void initializeGrid() {
+    // Initialize the grid with walkable and non-walkable tiles
+    tiles = List.generate(
+      64, // Change the total number of rows to 64
+      (rowIndex) => List.generate(
+        34,
+        (colIndex) {
+          // Adjust according to the specified configuration
+          if (rowIndex == 0 && colIndex == 33) {
+            return 'beacon1'; // Set Beacon1
+          } else if (rowIndex == 31 && colIndex == 0) {
+            return 'beacon2'; // Set Beacon2
+          } else if (rowIndex == 63 && colIndex == 33) {
+            return 'beacon3'; // Set Beacon3
+          } else if (rowIndex >= 0 && rowIndex <= 8) {
+            // 1st row to 9th row, tiles 31-34 are non-walkable
+            if (colIndex >= 30) {
+              return 'nonWalkable';
+            } else {
+              return 'walkable';
+            }
+          } else if (rowIndex >= 9 && rowIndex <= 34) {
+            // 10th row to 34th row
+            if (colIndex >= 0 && colIndex <= 4 ||
+                colIndex >= 10 && colIndex <= 14 ||
+                colIndex >= 20 && colIndex <= 24 ||
+                colIndex >= 30) {
+              return 'nonWalkable';
+            } else if (rowIndex == 34) {
+              // 35th row
+              if (colIndex >= 0 && colIndex <= 4 ||
+                  colIndex >= 10 && colIndex <= 14 ||
+                  colIndex >= 20 && colIndex <= 24) {
+                return 'nonWalkable';
+              }
+            }
+          } else if (rowIndex == 35) {
+            // 35th row
+            if (colIndex >= 0 && colIndex <= 4 ||
+                colIndex >= 10 && colIndex <= 14 ||
+                colIndex >= 20 && colIndex <= 24) {
+              return 'nonWalkable';
+            } else {
+              return 'walkable';
+            }
+          } else if (rowIndex >= 36 && rowIndex <= 41) {
+            // 36th row to 41st row, all walkable
+            return 'walkable';
+          } else if (rowIndex >= 42 && rowIndex <= 53) {
+            // 42nd row to 53rd row
+            if (colIndex >= 5 && colIndex <= 9) {
+              return 'walkable';
+            } else {
+              return 'nonWalkable';
+            }
+          } else if (rowIndex >= 60 && rowIndex <= 63) {
+            // 54th row to 59th row, all walkable
+            return 'nonWalkable';
+          }
+          return 'walkable';
+        },
+      ),
+    );
+  }
+
+  void _startBeaconTracking() {
+    _beaconSubscription =
+        BeaconService().startBeaconTracking().listen((results) {
+      setState(() {
+        closestBeaconDistance =
+            double.infinity; // Reset closest beacon distance
+        results.forEach((key, value) {
+          // Process beacon activity status
+          if (value) {
+            double distance = calculateDistance(key);
+            // Update user's location based on beacon signal strengths
+            updateUserLocation(key, distance);
+          }
+        });
+      });
+    });
+  }
+
+  double calculateDistance(String beaconName) {
+    // Simulate distance calculation using RSSI and TX power
+    double rssi = Random()
+        .nextInt(100)
+        .toDouble(); // Random RSSI value (for demonstration)
+    return pow(10, ((txPower - rssi) / (10 * 2)))
+        .toDouble(); // Using 2 as the value of N
+  }
+
+  void updateUserLocation(String beaconName, double distance) {
+    // Update the user's location based on beacon signal strengths
+    // You can implement your logic here to update the UI or perform any other actions
+    if (distance < closestBeaconDistance) {
+      closestBeaconDistance = distance;
+      setState(() {
+        switch (beaconName) {
+          case 'beacon1':
+            userRowIndex = 0;
+            userColIndex = 33;
+            break;
+          case 'beacon2':
+            userRowIndex = 31;
+            userColIndex = 0;
+            break;
+          case 'beacon3':
+            userRowIndex = 63;
+            userColIndex = 33;
+            break;
+          default:
+            break;
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
+    final double tileSize = screenSize.width / 34;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Grid Map Example'),
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+              color: Color.fromARGB(255, 0, 0, 0),
+              width: 5.0), // Add white border
+        ),
+        child: GridView.builder(
+          itemCount: tiles.length * tiles[0].length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: tiles[0].length,
+            childAspectRatio: 1.0,
+          ),
+          itemBuilder: (context, index) {
+            int rowIndex = index ~/ tiles[0].length;
+            int colIndex = index % tiles[0].length;
+            return _buildTileWidget(
+                tiles[rowIndex][colIndex], tileSize, rowIndex, colIndex);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTileWidget(
+      String type, double tileSize, int rowIndex, int colIndex) {
+    Color color;
+    switch (type) {
+      case 'walkable':
+        color = Colors.green;
+        break;
+      case 'nonWalkable':
+        color = Colors.red;
+        break;
+      case 'path':
+        color = Colors.blue;
+        break;
+      case 'beacon1':
+        color = Colors.orange; // Beacon1 color
+        break;
+      case 'beacon2':
+        color = Colors.yellow; // Beacon2 color
+        break;
+      case 'beacon3':
+        color = Colors.purple; // Beacon3 color
+        break;
+      default:
+        color = Colors.transparent;
+        break;
+    }
+
+    // Add a condition to display the user's position on the grid
+    if (rowIndex == userRowIndex && colIndex == userColIndex) {
+      color = Colors.blueAccent; // Change color for user's position
+    }
+
+    return Container(
+      width: tileSize,
+      height: tileSize,
+      margin: const EdgeInsets.all(1),
+      color: color,
+    );
+  }
+}

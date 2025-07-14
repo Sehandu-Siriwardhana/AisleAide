@@ -1,0 +1,86 @@
+{
+  "project_info": {
+    "project_number": "115576635974",
+    "project_id": "aisleaide-sign-in",
+    "storage_bucket": "aisleaide-sign-in.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:115576635974:android:37f155624a15f221b1c047",
+        "android_client_info": {
+          "package_name": "com.example.aisleaide"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "115576635974-6pl9rtih2ohfd3etu3f7103qc7d0setn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aisleaide",
+            "certificate_hash": "6ab670fa4ea5b20ad1c803a023b46a1bb2d60d5a"
+          }
+        },
+        {
+          "client_id": "115576635974-8851jees2tfdub0g19dp8h68mlksndmt.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aisleaide",
+            "certificate_hash": "21e8d32f41c414d4e55e9754cc5552ff0bde1b8d"
+          }
+        },
+        {
+          "client_id": "115576635974-91j6itdufv9395r70t4fflpkclr7r6bc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aisleaide",
+            "certificate_hash": "d21f4a950b097c6135bbcc8af5614fa5a47ba2ba"
+          }
+        },
+        {
+          "client_id": "115576635974-h7pccr099n7vp63tdqm0fh90012u727t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aisleaide",
+            "certificate_hash": "09469c31682942a5eedfc7aa2cdc59ddda53f7f3"
+          }
+        },
+        {
+          "client_id": "115576635974-hojsj0ub2dqoou7jbqts9gj3nfjm730t.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aisleaide",
+            "certificate_hash": "7c093cc804428ab7c057f09e3329bdf859c846bb"
+          }
+        },
+        {
+          "client_id": "115576635974-f0tcc2qd4nshub7v907s1i2i79i1snb6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxlyFD7hYuzNqGI8Yn0RUBZTrbj35Jvaw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "115576635974-f0tcc2qd4nshub7v907s1i2i79i1snb6.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "115576635974-hl50ck1man1hb9v3il8uo5kl3f5kvgoj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.aisleaide"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

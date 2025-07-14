@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+import 'dart:math';
+
+enum TileType {
+  walkable,
+  nonWalkable,
+  path,
+}
+
+class GridMap extends StatefulWidget {
+  const GridMap({Key? key}) : super(key: key);
+
+  @override
+  _GridMapState createState() => _GridMapState();
+}
+
+class _GridMapState extends State<GridMap> {
+  List<List<TileType>> tiles = [];
+  late List<List<bool>> visited;
+  late List<List<double>> fScores;
+  late List<List<double>> gScores;
+  late List<List<Offset>> cameFrom;
+
+  Offset? startPoint;
+  Offset? endPoint;
+  bool selectingStart = true;
+  bool generatingPath = false; // Flag to indicate if path is being generated
+
+  @override
+  void initState() {
+    super.initState();
+    initializeGrid();
+  }
+
+  void initializeGrid() {
+    tiles = List.generate(
+      65,
+      (rowIndex) => List.generate(
+        34,
+        (colIndex) {
+          // Your grid initialization logic here
+          return TileType.walkable;
+        },
+      ),
+    );
+
+    visited = List.generate(
+      65,
+      (rowIndex) => List.generate(34, (colIndex) => false),
+    );
+
+    fScores = List.generate(
+      65,
+      (rowIndex) => List.generate(34, (colIndex) => double.infinity),
+    );
+
+    gScores = List.generate(
+      65,
+      (rowIndex) => List.generate(34, (colIndex) => double.infinity),
+    );
+
+    cameFrom = List.generate(
+      65,
+      (rowIndex) => List.generate(34, (colIndex) => Offset(-1, -1)),
+    );
+  }
+
+  void _findAndVisualizePath(Offset start, Offset end) {
+    setState(() {
+      generatingPath = true; // Set generatingPath to true while generating the path
+    });
+    initializeAStar(start, end);
+    setState(() {
+      visualizePath();
+      generatingPath = false; // Set generatingPath to false when path generation is done
+    });
+  }
+
+  void initializeAStar(Offset start, Offset end) {
+    // A* algorithm initialization
+    // Your implementation here
+  }
+
+  double heuristic(Offset a, Offset b) {
+    // Heuristic calculation logic
+    // Your implementation here
+    return (a.dx - b.dx).abs() + (a.dy - b.dy).abs();
+  }
+
+  void visualizePath() {
+    // Path visualization logic
+    // Your implementation here
+  }
+
+  void _handleTap(int rowIndex, int colIndex) {
+    setState(() {
+      if (startPoint == null) {
+        startPoint = Offset(colIndex.toDouble(), rowIndex.toDouble());
+        selectingStart = false;
+      } else if (endPoint == null) {
+        endPoint = Offset(colIndex.toDouble(), rowIndex.toDouble());
+        _findAndVisualizePath(startPoint!, endPoint!);
+      }
+    });
+  }
+
+  Widget _buildTileWidget(TileType type, double tileSize, int rowIndex, int colIndex) {
+    Color color;
+    switch (type) {
+      case TileType.walkable:
+        color = Colors.green;
+        break;
+      case TileType.nonWalkable:
+        color = Colors.red;
+        break;
+      case TileType.path:
+        color = Colors.blue;
+        break;
+    }
+
+    String message = '';
+    bool showMessage = false;
+
+    if (startPoint != null &&
+        rowIndex == startPoint!.dy.toInt() &&
+        colIndex == startPoint!.dx.toInt()) {
+      color = Colors.black;
+    } else if (endPoint != null &&
+        rowIndex == endPoint!.dy.toInt() &&
+        colIndex == endPoint!.dx.toInt()) {
+      color = Colors.yellow;
+    } else if (startPoint == null) {
+      message = 'Select a starting point';
+      showMessage = true;
+    } else if (endPoint == null) {
+      message = 'Select an ending point';
+      showMessage = true;
+    } else if (tiles[rowIndex][colIndex] == TileType.path) {
+      color = Colors.blue;
+    }
+
+    return Stack(
+      children: [
+        Container(
+          width: tileSize,
+          height: tileSize,
+          margin: const EdgeInsets.all(1),
+          color: color,
+        ),
+        if (showMessage)
+          _buildMessageWidget(message),
+      ],
+    );
+  }
+
+  Widget _buildMessageWidget(String message) {
+    return Center(
+      child: Container(
+        color: Colors.black54,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Text(
+            message,
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
+    final double tileSize = screenSize.width / 34;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Grid Map Example'),
+      ),
+      body: Stack(
+        children: [
+          GridView.builder(
+            itemCount: tiles.length * tiles[0].length,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: tiles[0].length,
+              childAspectRatio: 1.0,
+            ),
+            itemBuilder: (context, index) {
+              int rowIndex = index ~/ tiles[0].length;
+              int colIndex = index % tiles[0].length;
+              return GestureDetector(
+                onTap: () {
+                  _handleTap(rowIndex, colIndex);
+                },
+                child: _buildTileWidget(
+                    tiles[rowIndex][colIndex], tileSize, rowIndex, colIndex),
+              );
+            },
+          ),
+          if (selectingStart && startPoint == null)
+            _buildMessageWidget('Select a starting point'),
+          if (!selectingStart && endPoint == null)
+            _buildMessageWidget('Select an ending point'),
+          if (generatingPath)
+            _buildMessageWidget('Generating path...'), // Display message while generating path
+        ],
+      ),
+    );
+  }
+}
+
+void main() {
+  runApp(const MaterialApp(
+    home: GridMap(),
+  ));
+}
